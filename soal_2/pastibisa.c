@@ -13,7 +13,7 @@
 
 static  const  char *dirpath = "/home/sisop/sisop/sensitif";
 
-//todo Make a base64 decode
+//// Make a base64 decode
 void decode_base64(char *input, char *output) {
 //     //!NOT DONE YET
 BIO *bio, *b64;
