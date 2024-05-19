@@ -1,3 +1,20 @@
+//! SECOND COMMIT COMPILING PROBLEM
+// pastibisa.c:20:22: warning: ‘dirpath’ defined but not used [-Wunused-variable]
+//    20 | static  const  char *dirpath = "/home/sisop/sisop/sensitif";
+//       |                      ^~~~~~~
+// /usr/bin/ld: /tmp/ccESjxPa.o: in function `decode_base64':
+// /home/sisop/Sisop-4-2024-MH-IT18/soal_2/pastibisa.c:30: undefined reference to `BIO_f_base64'
+// /usr/bin/ld: /home/sisop/Sisop-4-2024-MH-IT18/soal_2/pastibisa.c:30: undefined reference to `BIO_new'
+// /usr/bin/ld: /home/sisop/Sisop-4-2024-MH-IT18/soal_2/pastibisa.c:31: undefined reference to `BIO_new_fp'
+// /usr/bin/ld: /home/sisop/Sisop-4-2024-MH-IT18/soal_2/pastibisa.c:32: undefined reference to `BIO_push'
+// /usr/bin/ld: /home/sisop/Sisop-4-2024-MH-IT18/soal_2/pastibisa.c:34: undefined reference to `BIO_read'
+// /usr/bin/ld: /home/sisop/Sisop-4-2024-MH-IT18/soal_2/pastibisa.c:38: undefined reference to `BIO_free_all'
+// /usr/bin/ld: /tmp/ccESjxPa.o: in function `main':
+// /home/sisop/Sisop-4-2024-MH-IT18/soal_2/pastibisa.c:207: undefined reference to `fuse_main_real'
+// collect2: error: ld returned 1 exit status
+//!
+
+
 #define FUSE_USE_VERSION 28
 #include <fuse.h>
 #include <stdio.h>
@@ -8,8 +25,14 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <time.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
+
+static char access_password[256] = "";
 
 static  const  char *dirpath = "/home/sisop/sisop/sensitif";
 
@@ -141,13 +164,28 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset, stru
 
     if (res == -1) res = -errno;
 
-    if (strncmp(filename, "base64-", 7) == 0) {
+    const char *filename = strrchr(path, '/');
+    if (filename == NULL) filename = path; else filename++;
+
+    char file_buf[4096]; // Sesuaikan ukuran buffer dengan kebutuhan
+    char output_buf[4096];
+
+    if (strncmp(filename, "rahasia", 7) == 0 && strcmp(access_password, "") == 0) {
+        printf("Masukkan password: ");
+        if (fgets(access_password, sizeof(access_password), stdin) == NULL) {
+            return -1;
+        }
+        // Hapus newline character di akhir input
+        access_password[strcspn(access_password, "\n")] = 0;
+    }
+
+    if (strcmp(filename, "notes_base64.txt") == 0) {
         decode_base64(file_buf, output_buf);
-    } else if (strncmp(filename, "rot13-", 6) == 0) {
+    } else if (strcmp(filename, "enkripsi_rot13.txt") == 0) {
         decode_rot13(file_buf, output_buf);
-    } else if (strncmp(filename, "hex-", 4) == 0) {
+    } else if (strcmp(filename, "new_hex.txt") == 0) {
         decode_hex(file_buf, output_buf);
-    } else if (strncmp(filename, "rev-", 4) == 0) {
+    } else if (strcmp(filename, "rev_text.txt") == 0) {
         decode_rev(file_buf, output_buf);
     } else {
         strncpy(output_buf, file_buf, size);
@@ -171,6 +209,17 @@ static struct fuse_operations xmp_oper = {
 
 int  main(int  argc, char *argv[])
 {
+
+    printf("Set password for 'rahasia' : ");
+    if (fgets(access_password, sizeof(access_password), stdin) == NULL) {
+        return 1;
+    }
+
+    size_t len = strlen(access_password);
+    if (len > 0 && access_password[len - 1] == '\n') {
+        access_password[len - 1] = '\0';
+    }
+
     umask(0);
     return fuse_main(argc, argv, &xmp_oper, NULL);
 }
