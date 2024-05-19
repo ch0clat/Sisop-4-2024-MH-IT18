@@ -8,26 +8,30 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <time.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
 
 static  const  char *dirpath = "/home/sisop/sisop/sensitif";
 
 //todo Make a base64 decode
 void decode_base64(char *input, char *output) {
 //     //!NOT DONE YET
-//    while (*input) {
-//         if ((*input >= 'a' && *input <= 'z') || (*input >= 'A' && *input <= 'Z')) {
-//             if ((*input >= 'n' && *input <= 'z') || (*input >= 'N' && *input <= 'Z')) {
-//                 *output = *input - 13;
-//             } else {
-//                 *output = *input + 13;
-//             }
-//         } else {
-//             *output = *input;
-//         }
-//         input++;
-//         output++;
-//     }
-//     *output = '\0';
+BIO *bio, *b64;
+    int decodeLen = strlen(input);
+    char *buffer = (char *)malloc(decodeLen);
+    FILE *stream = fmemopen(input, decodeLen, "r");
+
+    b64 = BIO_new(BIO_f_base64());
+    bio = BIO_new_fp(stream, BIO_NOCLOSE);
+    bio = BIO_push(b64, bio);
+
+    decodeLen = BIO_read(bio, buffer, decodeLen);
+    buffer[decodeLen] = '\0';
+    strncpy(output, buffer, decodeLen + 1);
+
+    BIO_free_all(bio);
+    fclose(stream);
+    free(buffer);
 }
  
 void decode_rot13(char *input, char *output) {
