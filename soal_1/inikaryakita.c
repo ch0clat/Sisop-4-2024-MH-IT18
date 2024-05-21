@@ -1,19 +1,20 @@
-#include <dirent.h> // FUNGSI directory
-#include <stdio.h> // FUNGSI standard I/O
-#include <stdlib.h> // FUNGSI general utilities
-#include <string.h> // FUNGSI string manipulation
-#include <sys/stat.h> // FUNGSI file status
-#include <sys/types.h> // FUNGSI system data types
-#include <unistd.h> // FUNGSI POSIX API
+#define FUSE_USE_VERSION 31 // Disini kita memakai fuse ver 31 karena lebih stabil dan lancar.
+
+#include <fuse.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <errno.h>
 
 #define PATH_MAX_LENGTH 512  // define max length untuk paths agar memory allocation aman dan tidak overflow pada buffernya.
 
-
-    //====================================================================================================//
-   //    void digunakan dalam fungsi dibawah untuk specify bahwa fungsi tsb tidak perlu return value.    //
-  //====================================================================================================//
-  
-  
+//====================================================================================================//
+//    void digunakan dalam fungsi dibawah untuk specify bahwa fungsi tsb tidak perlu return value.    //
+//====================================================================================================//
 
 void watermark_and_move(const char *img_path); // FUNGSI add watermark dan memindahkan gambar
 void handle_gallery_folder(); // FUNGSI handle files di folder "gallery"
@@ -22,11 +23,9 @@ void reverse_test_files(); // FUNGSI reverse content dari files dengan prefix "t
 // FUNGSI execute script.sh
 void execute_script();
 
-
-  //====================================================================//
- // FUNGSI BUAT WATERMARK DI SETIAP IMAGES PADA DIREKTORI PORTOFOLIO   //
 //====================================================================//
-
+// FUNGSI BUAT WATERMARK DI SETIAP IMAGES PADA DIREKTORI PORTOFOLIO   //
+//====================================================================//
 
 void watermark_and_move(const char *img_path) { // FUNGSI add watermark ke foto lalu dimasukkan ke folder "wm"
     char cmd[1024]; // buffer untuk shell command
@@ -52,7 +51,7 @@ void handle_gallery_folder() {
     struct dirent *entry;  // structure buat store directory entry information 
 
     // open direktori "gallery" directory
-    if ((directory = opendir("")) != NULL) {
+    if ((directory = opendir("gallery")) != NULL) {
         
         // read setiap entry di directory
         while ((entry = readdir(directory)) != NULL) {
@@ -80,11 +79,9 @@ void handle_gallery_folder() {
     }
 }
 
-  //====================================================================//
- // FUNGSI BUAT REVERSE TEXTFILE/CONTENT YANG ADA PREFIX "TEST"NYA     //
 //====================================================================//
-
-
+// FUNGSI BUAT REVERSE TEXTFILE/CONTENT YANG ADA PREFIX "TEST"NYA     //
+//====================================================================//
 
 void reverse_test_files() { // FUNGSI reverse content-nya files dengan prefix "test" terus save jadi file baru
     struct dirent *entry;  // structure untuk store directory entry information
@@ -156,10 +153,91 @@ void execute_script() {
     system("./bahaya/script.sh");
 }
 
-                  //===================================//
-                 //  FUNGSI MAIN + EKSEKUSI SCRIP.SH  //
-                //===================================//
-int main() {
+//============================//
+// FUSE FUNCTIONS IMPLEMENTATION //
+//============================//
+
+static const char *base_path = "/";  // Base path for the filesystem
+
+static int myfs_getattr(const char *path, struct stat *stbuf) {
+    int res;
+    char full_path[PATH_MAX_LENGTH];
+    snprintf(full_path, sizeof(full_path), "root%s", path);  // Assuming 'root' is the root directory
+
+    res = lstat(full_path, stbuf);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
+    DIR *dp;
+    struct dirent *de;
+    char full_path[PATH_MAX_LENGTH];
+    snprintf(full_path, sizeof(full_path), "root%s", path);  // Assuming 'root' is the root directory
+
+    dp = opendir(full_path);
+    if (dp == NULL)
+        return -errno;
+
+    while ((de = readdir(dp)) != NULL) {
+        struct stat st;
+        memset(&st, 0, sizeof(st));
+        st.st_ino = de->d_ino;
+        st.st_mode = de->d_type << 12;
+        if (filler(buf, de->d_name, &st, 0))
+            break;
+    }
+
+    closedir(dp);
+    return 0;
+}
+
+static int myfs_open(const char *path, struct fuse_file_info *fi) {
+    int res;
+    char full_path[PATH_MAX_LENGTH];
+    snprintf(full_path, sizeof(full_path), "root%s", path);  // Assuming 'root' is the root directory
+
+    res = open(full_path, fi->flags);
+    if (res == -1)
+        return -errno;
+
+    close(res);
+    return 0;
+}
+
+static int myfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    int fd;
+    int res;
+    char full_path[PATH_MAX_LENGTH];
+    snprintf(full_path, sizeof(full_path), "root%s", path);  // Assuming 'root' is the root directory
+
+    fd = open(full_path, O_RDONLY);
+    if (fd == -1)
+        return -errno;
+
+    res = pread(fd, buf, size, offset);
+    if (res == -1)
+        res = -errno;
+
+    close(fd);
+    return res;
+}
+
+// FUSE operations structure
+static struct fuse_operations myfs_oper = {
+    .getattr = myfs_getattr,
+    .readdir = myfs_readdir,
+    .open    = myfs_open,
+    .read    = myfs_read,
+};
+
+//===================================//
+//  FUNGSI MAIN + EKSEKUSI SCRIPT.SH  //
+//===================================//
+
+int main(int argc, char *argv[]) {
 
     // handle folder "gallery" folder untuk add watermark ke images
     handle_gallery_folder();
@@ -178,5 +256,6 @@ int main() {
     // remove folder "gallery" dan "bahaya" folders bersama isi-isinya (Sesuai script.sh)
     system("rm -rf gallery bahaya");
 
-    return 0;  
+    // Set up and run FUSE filesystem
+    return fuse_main(argc, argv, &myfs_oper, NULL);
 }
