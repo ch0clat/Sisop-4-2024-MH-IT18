@@ -342,3 +342,36 @@ int main(int argc, char *argv[]) {
     return fuse_main(argc, argv, &myfs_oper, NULL);
 }
 ```
+
+Berikut adalah cara untuk menjalankan programnya:
+Pertama, compile program dengan cara dibawah:
+```c
+gcc -o pakefuse inikaryakita.c -D_FILE_OFFSET_BITS=64 -lfuse
+```
+Kedua, mount program fuse tersebut ke dalam sebuah mount point.
+```c
+sudo ./pakefuse ~/fuse_mount
+```
+Ketiga, terminal akan menampilkan hasil output sebagai berikut:
+![Screenshot from 2024-05-24 22-54-09](https://github.com/ch0clat/Sisop-4-2024-MH-IT18/assets/151893499/40aeb1f4-2538-40bb-ba65-3aaf8d65e726)
+
+`Gambar sebelum ada watermark:`
+
+![Screenshot from 2024-05-20 17-43-11](https://github.com/ch0clat/Sisop-4-2024-MH-IT18/assets/151893499/972b6d08-8dd4-402e-8d4f-c9b6b1d7223d)
+
+`Hasil gambar setelah ada watermark:`
+
+![Screenshot from 2024-05-20 17-47-20](https://github.com/ch0clat/Sisop-4-2024-MH-IT18/assets/151893499/a7db0040-85ff-4602-abcf-1f49d29c94a6)
+
+`Text sebelum di reverse:`
+
+![Screenshot from 2024-05-20 17-44-08](https://github.com/ch0clat/Sisop-4-2024-MH-IT18/assets/151893499/bf4ed802-4405-4df7-a986-829a02e54007)
+
+`Hasil text setelah di reverse:`
+
+![Screenshot from 2024-05-20 17-48-08](https://github.com/ch0clat/Sisop-4-2024-MH-IT18/assets/151893499/03dc6a4c-4bf3-4fe3-a4fa-a9a5d5503666)
+
+
+
+
+
