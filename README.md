@@ -371,6 +371,164 @@ Ketiga, terminal akan menampilkan hasil output sebagai berikut:
 
 ![Screenshot from 2024-05-20 17-48-08](https://github.com/ch0clat/Sisop-4-2024-MH-IT18/assets/151893499/03dc6a4c-4bf3-4fe3-a4fa-a9a5d5503666)
 
+## Soal 2
+pastibisa.c
+```c
+void decode_base64(const char *input, char *output) {
+    BIO *bio, *b64;
+    size_t decodeLen = strlen(input);
+    char *buffer = (char *)malloc(decodeLen);
+    FILE *stream = fmemopen((void*)input, decodeLen, "r");
+
+    b64 = BIO_new(BIO_f_base64());
+    bio = BIO_new_fp(stream, BIO_NOCLOSE);
+    bio = BIO_push(b64, bio);
+
+    decodeLen = BIO_read(bio, buffer, decodeLen);
+    buffer[decodeLen] = '\0';
+    strncpy(output, buffer, decodeLen + 1);
+
+    BIO_free_all(bio);
+    fclose(stream);
+    free(buffer);
+}
+
+void decode_rot13(char *input, char *output) {
+    while (*input) {
+        if ((*input >= 'a' && *input <= 'z') || (*input >= 'A' && *input <= 'Z')) {
+            if ((*input >= 'n' && *input <= 'z') || (*input >= 'N' && *input <= 'Z')) {
+                *output = *input - 13;
+            } else {
+                *output = *input + 13;
+            }
+        } else {
+            *output = *input;
+        }
+        input++;
+        output++;
+    }
+    *output = '\0';
+}
+
+void decode_hex(char *input, char *output) {
+    while (*input && *(input + 1)) {
+        *output = (char)((strchr("0123456789ABCDEF", toupper(*input)) - "0123456789ABCDEF") * 16 +
+                         (strchr("0123456789ABCDEF", toupper(*(input + 1))) - "0123456789ABCDEF"));
+        input += 2;
+        output++;
+    }
+    *output = '\0';
+}
+
+void decode_rev(char *input, char *output) {
+    size_t len = strlen(input);
+    for (size_t i = 0; i < len; i++) {
+        output[i] = input[len - i - 1];
+    }
+    output[len] = '\0';
+}
+```
+Program ini akan melakukan decoding melalui function - function yang telah di buat di atas. Function ini akan di panggil jika file mempunyai nama yang sesuai dengan dengan prefix yang sudah di tentukan. Case dia atas akan di panggil oleh `If` di bawah ini 
+
+```c
+static int xmp_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    int fd;
+    int res;
+
+    (void) fi;
+
+    char fpath[1000];
+    sprintf(fpath, "%s%s", dirpath, path);
+
+    fd = open(fpath, O_RDONLY);
+    if (fd == -1) {
+        log_message("FAILED", "read", fpath);
+        return -errno;
+    }
+
+    res = pread(fd, buf, size, offset);
+    if (res == -1) {
+        close(fd);
+        log_message("FAILED", "read", fpath);
+        return -errno;
+    }
+
+    char decoded_content[4096] = {0};
+    if (strstr(fpath, "base64")) {
+        decode_base64(buf, decoded_content);
+    } else if (strstr(fpath, "rot13")) {
+        decode_rot13(buf, decoded_content);
+    } else if (strstr(fpath, "hex")) {
+        decode_hex(buf, decoded_content);
+    } else if (strstr(fpath, "rev")) {
+        decode_rev(buf, decoded_content);
+    }
+
+    if (decoded_content[0] != '\0') {
+        strncpy(buf, decoded_content, size);
+    }
+
+    log_message("SUCCESS", "read", fpath);
+    close(fd);
+    return res;
+}
+```
+`res = pread(fd, buf, size, offset);` akan membaca file yang di buka dan menyimpan tulisan yang terbaca pada `buf`. file path akan di simpan pada `fpath` dan jika pada path tersebut terdapat prefix decode yang tertentu `buf` akan di decode melalui functions yang sudah terdefine di atas.  `if (decoded_content[0] != '\0')` akan melakukan pengecekan apakah decoded_content mempunyai isi atau tidak. jika decoded_content ini terisi `buf` akan di ganti dengan decoded content menggunakan `strncpy(buf, decoded_content, size);`. setelah itu `log_message("SUCCESS", "read", fpath);` akan melakukan loging.
+
+```c
+void log_message(const char* status, const char* tag, const char* additional_info) {
+    time_t rawtime;
+    struct tm *info;
+    char timestamp[80];
+
+    time(&rawtime);
+    info = localtime(&rawtime);
+
+    strftime(timestamp, 80, "%d/%m/%Y-%H:%M:%S", info);
+
+    FILE *fp = fopen("/home/ubuntu-sisop/sisop/logs-fuse.log", "a");
+    if (fp == NULL) {
+        perror("Failed to open log file");
+        return;
+    }
+
+    fprintf(fp, "[%s]::%s::[%s]::[%s]\n", status, timestamp, tag, additional_info);
+    fclose(fp);
+}
+```
+function ini akan melakukan logging jika function di panggil dari function lain. `FILE *fp = fopen("/home/ubuntu-sisop/sisop/logs-fuse.log", "a");` akan membukan file atau membuat file baru jika file tersebut tidak di temukan. `fprintf(fp, "[%s]::%s::[%s]::[%s]\n", status, timestamp, tag, additional_info);` akan menambahkan line baru sesuai dengan message yang di berikan dari function call dan mengisi waktu sesuai `strftime(timestamp, 80, "%d/%m/%Y-%H:%M:%S", info);`. 
+
+untuk menggunakan kode ini compile yang harus digunakan adalah sebagi berikut :
+
+`gcc -o pastibisa pastibisa.c -lssl -lcrypto -D_FILE_OFFSET_BITS=64`
+
+dan untuk melakukan mounting :
+
+`./pastibisa /tujuan/direktori/mount`
+
+### SCREENSHOTS 
+
+Sebelum decode :
+
+![image](https://github.com/ch0clat/Sisop-4-2024-MH-IT18/assets/128571877/9014aa2a-4341-4b0d-a276-258305f094b5)
+
+
+Sesudah decode :
+
+![image](https://github.com/ch0clat/Sisop-4-2024-MH-IT18/assets/128571877/cf88b4e0-b02d-41ce-97d5-acd6c0c19b1a)
+
+###REVISI 
+
+<ul>
+<li>folder "Rahasia-berkas" belum bisa di lock dengan password saat membuka folder tersebut. pada program ini password hanya bisa di input pada saat mounting.</li>
+</ul>
+
+
+
+
+
+
+
 
 
 
